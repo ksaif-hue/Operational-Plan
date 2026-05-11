@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام تقارير حضور المعلمين</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+:root {
+  --bg: #060d1a;
+  --surface: #0d1b2e;
+  --surface2: #112240;
+  --surface3: #1a3358;
+  --accent: #4f9cf9;
+  --accent2: #38bdf8;
+  --teal: #0d9488;
+  --gold: #f59e0b;
+  --border: rgba(79,156,249,0.18);
+  --border2: rgba(79,156,249,0.08);
+  --text: #e2eaf4;
+  --muted: #7a99bb;
+  --lv1: #ef4444; --lv2: #f97316; --lv3: #eab308; --lv4: #22c55e; --lv5: #15803d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: "Tajawal", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  direction: rtl;
+  min-height: 100vh;
+}
+
+/* ── HERO ─────────────────────────────────────── */
+.hero {
+  background: linear-gradient(135deg, #060d1a 0%, #0a1628 50%, #0d2040 100%);
+  padding: 36px 24px 28px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.hero::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 600px 300px at 20% 50%, rgba(79,156,249,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 200px at 80% 30%, rgba(13,148,136,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(79,156,249,0.04) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(79,156,249,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.hero-badge {
+  display: inline-block;
+  background: rgba(79,156,249,0.12);
+  border: 1px solid rgba(79,156,249,0.3);
+  color: var(--accent2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  position: relative;
+}
+.hero-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #fff;
+  position: relative;
+  background: linear-gradient(135deg, #fff 0%, var(--accent2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+.hero-sub {
+  font-size: 0.9rem;
+  color: var(--muted);
+  position: relative;
+}
+.hero-dots {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 18px;
+  position: relative;
+}
+.hero-dot {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.75rem; color: var(--muted);
+}
+.hero-dot span {
+  width: 7px; height: 7px; border-radius: 50%;
+}
+
+/* ── LAYOUT ───────────────────────────────────── */
+.container { max-width: 1380px; margin: 0 auto; padding: 24px 16px; }
+
+/* ── STEP CARDS ───────────────────────────────── */
+.step-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: box-shadow 0.3s;
+}
+.step-section:hover { box-shadow: 0 0 0 1px rgba(79,156,249,0.15), 0 8px 40px rgba(0,0,0,0.4); }
+.step-header {
+  padding: 16px 22px;
+  display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--border2);
+  cursor: pointer;
+  user-select: none;
+}
+.step-num {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--accent), #2563eb);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.82rem; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(79,156,249,0.4);
+}
+.step-num.done { background: linear-gradient(135deg, var(--teal), #0f766e); box-shadow: 0 0 12px rgba(13,148,136,0.4); }
+.step-num.done::after { content: "✓"; }
+.step-title { font-size: 1rem; font-weight: 700; color: var(--text); flex: 1; }
+.step-status { font-size: 0.77rem; color: var(--muted); }
+.step-body { padding: 20px 22px; }
+.step-chevron {
+  color: var(--muted); font-size: 1.1rem;
+  transition: transform 0.2s;
+}
+.step-section.collapsed .step-chevron { transform: rotate(-90deg); }
+.step-section.collapsed .step-body { display: none; }
+
+/* ── FILE UPLOAD ──────────────────────────────── */
+.upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.upload-zone {
+  border: 2px dashed rgba(79,156,249,0.25);
+  border-radius: 14px;
+  padding: 20px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s;
+  background: var(--surface2);
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(79,156,249,0.06);
+}
+.upload-zone.loaded {
+  border-color: rgba(13,148,136,0.5);
+  background: rgba(13,148,136,0.06);
+}
+.upload-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+.upload-icon { font-size: 2rem; margin-bottom: 8px; }
+.upload-title { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.upload-sub { font-size: 0.75rem; color: var(--muted); }
+.upload-ok { font-size: 0.78rem; color: #34d399; font-weight: 600; margin-top: 6px; }
+.upload-err { font-size: 0.75rem; color: #f87171; margin-top: 4px; }
+
+.parse-btn-row { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+/* ── CONTROLS ─────────────────────────────────── */
+.controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+.ctrl-label { font-size: 0.79rem; font-weight: 600; color: var(--muted); }
+.ctrl-input {
+  padding: 10px 13px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: "Tajawal", sans-serif;
+  font-size: 0.92rem;
+  transition: border-color 0.2s;
+}
+.ctrl-input:focus { outline: none; border-color: var(--accent); background: var(--surface3); }
+input[type="date"].ctrl-input { direction: ltr; text-align: right; color-scheme: dark; }
+
+.weeks-box {
+  background: rgba(13,148,136,0.08);
+  border: 1.5px solid rgba(13,148,136,0.3);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+.weeks-box-title { font-size: 0.83rem; font-weight: 700; color: #34d399; margin-bottom: 10px; }
+.weeks-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.weeks-big-input {
+  width: 110px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 2px solid rgba(13,148,136,0.4);
+  border-radius: 10px;
+  color: #34d399;
+  font-family: "Tajawal", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+}
+.weeks-big-input:focus { outline: none; border-color: #34d399; }
+.weeks-chip {
+  font-size: 0.78rem; padding: 5px 12px; border-radius: 20px;
+  font-weight: 700; border: 1px solid;
+}
+.weeks-chip.auto { background: rgba(13,148,136,0.12); border-color: rgba(13,148,136,0.4); color: #34d399; }
+.weeks-chip.manual { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+
+/* ── LOAD TABLE ───────────────────────────────── */
+.load-wrap { max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; }
+.load-wrap::-webkit-scrollbar { width: 6px; }
+.load-wrap::-webkit-scrollbar-track { background: var(--surface2); }
+.load-wrap::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+table.load-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+table.load-table thead th {
+  background: var(--surface2);
+  padding: 9px 10px;
+  font-weight: 700; color: var(--accent2);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 2; text-align: center;
+  white-space: nowrap;
+}
+table.load-table thead th:nth-child(2) { text-align: right; }
+table.load-table tbody tr { transition: background 0.15s; }
+table.load-table tbody tr:hover { background: rgba(79,156,249,0.05); }
+table.load-table tbody tr.zero-load { background: rgba(245,158,11,0.05); }
+table.load-table td { padding: 7px 10px; border-bottom: 1px solid var(--border2); text-align: center; }
+table.load-table td:nth-child(2) { text-align: right; font-weight: 600; color: var(--text); }
+.num-badge {
+  background: var(--surface3); border-radius: 8px;
+  padding: 2px 9px; font-weight: 700; font-size: 0.8rem; color: var(--accent2);
+}
+.load-input {
+  width: 70px; padding: 4px 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: "Tajawal", sans-serif;
+  font-size: 0.83rem; text-align: center;
+}
+.load-input:focus { outline: none; border-color: var(--accent); }
+.load-input.mod { border-color: #f97316; color: #f97316; background: rgba(249,115,22,0.06); }
+
+/* ── BUTTONS ──────────────────────────────────── */
+.btn {
+  padding: 10px 22px;
+  border: none; border-radius: 10px;
+  font-family: "Tajawal", sans-serif;
+  font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #2563eb);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(79,156,249,0.3);
+}
+.btn-primary:hover { box-shadow: 0 6px 24px rgba(79,156,249,0.45); transform: translateY(-1px); }
+.btn-teal {
+  background: linear-gradient(135deg, var(--teal), #0f766e);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(13,148,136,0.3);
+}
+.btn-teal:hover { box-shadow: 0 6px 24px rgba(13,148,136,0.45); transform: translateY(-1px); }
+.btn-gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.3);
+}
+.btn-gold:hover { box-shadow: 0 6px 24px rgba(245,158,11,0.4); transform: translateY(-1px); }
+.btn-ghost {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-sm { padding: 6px 14px; font-size: 0.78rem; }
+.btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+.btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* ── STATS ────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+.stat-card:hover { transform: translateY(-2px); }
+.stat-num { font-size: 1.7rem; font-weight: 900; line-height: 1; }
+.stat-label { font-size: 0.7rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+/* ── LEGEND ───────────────────────────────────── */
+.legend {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+.leg-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.75rem; font-weight: 600;
+  padding: 4px 11px; border-radius: 20px;
+  cursor: pointer; transition: all 0.15s;
+  border: 1.5px solid transparent;
+}
+.leg-item:hover { transform: scale(1.04); }
+.leg-item.active { border-color: currentColor; }
+.leg-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ── RESULTS TABLE ────────────────────────────── */
+.results-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.results-header {
+  background: var(--surface2);
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.results-title { font-size: 1rem; font-weight: 700; }
+.results-meta { font-size: 0.78rem; color: var(--muted); }
+.search-input {
+  padding: 7px 13px;
+  background: var(--surface3);
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-family: "Tajawal", sans-serif;
+  font-size: 0.85rem; width: 200px;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+.table-scroll { overflow-x: auto; }
+.table-scroll::-webkit-scrollbar { height: 6px; }
+.table-scroll::-webkit-scrollbar-track { background: var(--surface); }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+table.res { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+table.res thead th {
+  background: var(--surface2);
+  padding: 11px 10px;
+  font-weight: 700; color: var(--accent2);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap; text-align: center;
+  position: sticky; top: 0; z-index: 5;
+}
+table.res thead th:nth-child(2) { text-align: right; min-width: 190px; }
+table.res tbody tr { transition: background 0.12s; }
+table.res tbody tr:hover { background: rgba(79,156,249,0.05); }
+table.res tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+table.res tbody tr:nth-child(even):hover { background: rgba(79,156,249,0.05); }
+table.res td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border2);
+  text-align: center; vertical-align: middle;
+}
+table.res td:nth-child(2) { text-align: right; font-weight: 600; }
+table.res td:first-child { color: var(--muted); font-size: 0.75rem; }
+
+.lv-badge {
+  display: inline-block; padding: 4px 12px;
+  border-radius: 20px; font-weight: 700;
+  font-size: 0.77rem; white-space: nowrap;
+}
+.lv1 { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+.lv2 { background: rgba(249,115,22,0.15); color: #fdba74; border: 1px solid rgba(249,115,22,0.3); }
+.lv3 { background: rgba(234,179,8,0.15); color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
+.lv4 { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+.lv5 { background: rgba(21,128,61,0.2); color: #4ade80; border: 1px solid rgba(21,128,61,0.4); }
+
+.bar-wrap { display: flex; align-items: center; gap: 7px; min-width: 130px; }
+.bar { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.pct-txt { font-weight: 700; font-size: 0.85rem; min-width: 52px; text-align: left; }
+
+.mod-star { font-size: 0.65rem; color: #f97316; vertical-align: super; margin-right: 2px; }
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--muted);
+}
+.empty-state p { margin-top: 12px; font-size: 0.9rem; }
+
+.info-box {
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 0.79rem; display: flex; gap: 8px; align-items: flex-start;
+  margin-bottom: 12px;
+}
+.info-blue { background: rgba(79,156,249,0.08); border: 1px solid rgba(79,156,249,0.2); color: var(--accent2); }
+.info-green { background: rgba(13,148,136,0.08); border: 1px solid rgba(13,148,136,0.2); color: #34d399; }
+.info-amber { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); color: #fbbf24; }
+
+.tag { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+.tag-blue { background: rgba(79,156,249,0.15); color: var(--accent); }
+.tag-teal { background: rgba(13,148,136,0.15); color: #2dd4bf; }
+
+/* ── PDF PRINT ────────────────────────────────── */
+@media print {
+  body { background: #fff !important; color: #000 !important; direction: rtl; }
+  .no-print { display: none !important; }
+  .hero { background: #fff !important; padding: 16px; border-bottom: 2px solid #000; }
+  .hero-title { color: #000 !important; -webkit-text-fill-color: #000 !important; font-size: 1.4rem; }
+  .hero-sub, .hero-badge, .hero-dots { color: #555 !important; }
+  .hero::before, .hero-grid { display: none; }
+  .print-header { display: block !important; }
+  .step-section { display: none; }
+  .results-card { border: 1px solid #ccc; border-radius: 0; box-shadow: none; }
+  .results-header { background: #f0f0f0 !important; color: #000 !important; }
+  .results-title, .results-meta { color: #000 !important; }
+  .stats-grid { break-inside: avoid; }
+  .stat-card { background: #f9f9f9 !important; border: 1px solid #ddd !important; }
+  .stat-num { color: #000 !important; }
+  .stat-label { color: #555 !important; }
+  .legend { background: #f0f0f0 !important; border: 1px solid #ccc !important; }
+  .leg-item { color: #000 !important; border-color: #ccc !important; }
+  table.res thead th { background: #f0f0f0 !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
+  table.res td { color: #000 !important; border-bottom: 1px solid #eee !important; }
+  table.res td:nth-child(2) { color: #000 !important; }
+  table.res td:first-child { color: #666 !important; }
+  table.res tbody tr:nth-child(even) { background: #fafafa !important; }
+  .lv-badge { border: 1px solid #999 !important; color: #000 !important; background: #eee !important; }
+  .pct-txt { color: #000 !important; }
+  .bar { display: none; }
+  .bar-wrap { justify-content: center; }
+  @page { size: A4 landscape; margin: 14mm 10mm; }
+}
+.print-header { display: none; margin-bottom: 14px; }
+.print-header h2 { font-size: 1.1rem; font-weight: 800; color: #000; }
+.print-header p { font-size: 0.82rem; color: #555; margin-top: 4px; }
+
+/* ── MISC ─────────────────────────────────────── */
+.divider { height: 1px; background: var(--border2); margin: 14px 0; }
+.muted { color: var(--muted); }
+.flex-wrap { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero no-print">
+  <div class="hero-grid"></div>
+  <div class="hero-badge">نظام تقارير المعلمين · مدارس أبوظبي</div>
+  <div class="hero-title">نظام حضور المعلمين</div>
+  <div class="hero-sub">رفع ملفات المنهل وحساب نسب الحضور وتصدير التقرير — يعمل لسنوات متعددة</div>
+  <div class="hero-dots">
+    <div class="hero-dot"><span style="background:#4f9cf9"></span>بيانات الموظفين</div>
+    <div class="hero-dot"><span style="background:#0d9488"></span>نصاب المعلمين</div>
+    <div class="hero-dot"><span style="background:#f59e0b"></span>تقرير الحضور اليومي</div>
+    <div class="hero-dot"><span style="background:#a855f7"></span>إصدار التقرير PDF</div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- PRINT HEADER -->
+<div class="print-header" id="printHeader">
+  <h2 id="printTitle">تقرير حضور المعلمين</h2>
+  <p id="printMeta"></p>
+</div>
+
+<!-- ══ STEP 1: Upload Files ══ -->
+<div class="step-section no-print" id="step1">
+  <div class="step-header" onclick="toggleStep('step1')">
+    <div class="step-num" id="s1num">1</div>
+    <div class="step-title">رفع ملفات البيانات</div>
+    <div class="step-status" id="s1status">لم تُرفع ملفات بعد</div>
+    <div class="step-chevron">▾</div>
+  </div>
+  <div class="step-body">
+    <div class="info-box info-blue">
+      📎 ارفع الملفات الثلاثة من نظام المنهل. يمكن رفع ملفات جديدة في أي وقت لسنة دراسية جديدة.
+    </div>
+
+    <div class="upload-grid">
+
+      <!-- Staff Details -->
+      <div class="upload-zone" id="zone-staff" ondragover="dragOver(event,'zone-staff')" ondragleave="dragLeave('zone-staff')" ondrop="dropFile(event,'staff')">
+        <input type="file" accept=".xlsx,.xls" onchange="handleFile(event,'staff')">
+        <div class="upload-icon">👩‍💼</div>
+        <div class="upload-title">بيانات الموظفين</div>
+        <div class="upload-sub">FNStaff_Details_per_Job_Position.xlsx</div>
+        <div class="upload-sub" style="margin-top:3px">يحتوي: اسم الموظف، رقمه، الجنسية، كود المدرسة</div>
+        <div id="staff-ok" class="upload-ok" style="display:none"></div>
+        <div id="staff-err" class="upload-err" style="display:none"></div>
+      </div>
+
+      <!-- Teacher Load -->
+      <div class="upload-zone" id="zone-load" ondragover="dragOver(event,'zone-load')" ondragleave="dragLeave('zone-load')" ondrop="dropFile(event,'load')">
+        <input type="file" accept=".xlsx,.xls" onchange="handleFile(event,'load')">
+        <div class="upload-icon">📚</div>
+        <div class="upload-title">نصاب المعلمين</div>
+        <div class="upload-sub">FNTeacher_Load.xlsx</div>
+        <div class="upload-sub" style="margin-top:3px">يحتوي: اسم المعلم، النصاب الأسبوعي، كود المدرسة</div>
+        <div id="load-ok" class="upload-ok" style="display:none"></div>
+        <div id="load-err" class="upload-err" style="display:none"></div>
+      </div>
+
+      <!-- Daily Progress -->
+      <div class="upload-zone" id="zone-daily" ondragover="dragOver(event,'zone-daily')" ondragleave="dragLeave('zone-daily')" ondrop="dropFile(event,'daily')">
+        <input type="file" accept=".xlsx,.xls" onchange="handleFile(event,'daily')">
+        <div class="upload-icon">📅</div>
+        <div class="upload-title">التقرير اليومي (المنهل)</div>
+        <div class="upload-sub">التقرير_اليومي_لحضور_المواد_الدراسية.xls</div>
+        <div class="upload-sub" style="margin-top:3px">يحتوي: اسم المعلم، التاريخ، الحصص المُدخلة</div>
+        <div id="daily-ok" class="upload-ok" style="display:none"></div>
+        <div id="daily-err" class="upload-err" style="display:none"></div>
+      </div>
+
+    </div>
+
+    <div class="parse-btn-row" style="margin-top:16px;">
+      <button class="btn btn-primary" onclick="parseAllFiles()">⚡ معالجة الملفات</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetAll()">↺ إعادة تعيين الكل</button>
+      <span id="parseStatus" style="font-size:0.8rem;color:var(--muted);"></span>
+    </div>
+
+    <!-- School selector (appears after parsing) -->
+    <div id="schoolSelector" style="display:none; margin-top:14px;">
+      <div class="info-box info-green">
+        ✅ تم معالجة الملفات. اختر كود المدرسة:
+      </div>
+      <div class="flex-wrap">
+        <div class="ctrl-group" style="min-width:200px;">
+          <label class="ctrl-label">🏫 كود المدرسة</label>
+          <select id="schoolCode" class="ctrl-input" onchange="onSchoolChange()">
+            <option value="">— اختر —</option>
+          </select>
+        </div>
+        <span id="schoolInfo" style="font-size:0.8rem;color:var(--muted);"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STEP 2: Period & Weeks ══ -->
+<div class="step-section no-print" id="step2">
+  <div class="step-header" onclick="toggleStep('step2')">
+    <div class="step-num" id="s2num">2</div>
+    <div class="step-title">تحديد الفترة وعدد الأسابيع</div>
+    <div class="step-status" id="s2status">في انتظار الخطوة 1</div>
+    <div class="step-chevron">▾</div>
+  </div>
+  <div class="step-body">
+    <div class="controls-grid">
+      <div class="ctrl-group">
+        <label class="ctrl-label">📅 تاريخ البداية</label>
+        <input type="date" id="startDate" class="ctrl-input" onchange="onDatesChange()">
+      </div>
+      <div class="ctrl-group">
+        <label class="ctrl-label">📅 تاريخ النهاية</label>
+        <input type="date" id="endDate" class="ctrl-input" onchange="onDatesChange()">
+      </div>
+      <div class="ctrl-group" style="justify-content:flex-end;">
+        <label class="ctrl-label"> </label>
+        <button class="btn btn-teal" onclick="applyDates()">✔ تطبيق الفترة</button>
+      </div>
+    </div>
+
+    <div id="dateInfo" style="margin-top:8px;font-size:0.81rem;color:var(--muted);min-height:18px;"></div>
+
+    <div class="weeks-box" id="weeksBox" style="display:none;">
+      <div class="weeks-box-title">📌 عدد الأسابيع المعتمدة للحساب</div>
+      <div class="weeks-row">
+        <input type="number" id="weeksOverride" class="weeks-big-input"
+          min="1" max="52" placeholder="—"
+          oninput="onWeeksChange()">
+        <span class="weeks-chip auto" id="weeksAutoChip">تلقائي: — أسبوع</span>
+        <button class="btn btn-ghost btn-sm" onclick="resetWeeks()">↺ تلقائي</button>
+        <span class="weeks-chip" id="weeksUsedChip" style="display:none;"></span>
+      </div>
+      <div style="margin-top:8px;font-size:0.77rem;color:#34d399;">
+        💡 الحساب التلقائي من التواريخ الموجودة في الملف فقط. يمكنك تعديله يدوياً.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STEP 3: Load Override ══ -->
+<div class="step-section no-print" id="step3">
+  <div class="step-header" onclick="toggleStep('step3')">
+    <div class="step-num" id="s3num">3</div>
+    <div class="step-title">مراجعة النصاب الأسبوعي (اختياري)</div>
+    <div class="step-status" id="s3status">في انتظار الخطوة 2</div>
+    <div class="step-chevron">▾</div>
+  </div>
+  <div class="step-body">
+    <div class="info-box info-green">
+      ✅ الحصص تُحسب فقط من الأيام الموجودة في الملف ضمن الفترة المختارة.
+    </div>
+    <div class="info-box info-amber">
+      ✏️ عدّل النصاب لأي معلمة في إجازة أو تغيّر نصابها. المعلمات الصفراء نصابهن 0.
+    </div>
+
+    <div class="flex-wrap" style="margin-bottom:12px;">
+      <button class="btn btn-ghost btn-sm" onclick="toggleZeroRows()">👁 إخفاء/إظهار نصاب 0</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetLoads()">↺ استعادة الأصلي</button>
+      <span id="modCount" style="font-size:0.79rem;color:#f97316;font-weight:600;"></span>
+    </div>
+
+    <div class="load-wrap">
+      <table class="load-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>اسم المعلمة</th>
+            <th>رقم الموظف</th>
+            <th>النصاب الأصلي</th>
+            <th>النصاب المعدّل</th>
+            <th>الحصص المتوقعة<br><small id="loadWeeksNote" style="font-weight:400;color:var(--muted);">—</small></th>
+          </tr>
+        </thead>
+        <tbody id="loadTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="calculate()">⚡ احسب النتائج</button>
+      <button class="btn btn-gold" onclick="printReport()">🖨 تصدير PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RESULTS ══ -->
+<div id="resultsSection" style="display:none;">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <!-- Legend -->
+  <div class="legend" id="legendRow">
+    <span style="font-size:0.77rem;font-weight:700;color:var(--muted);">التصفية:</span>
+    <span class="leg-item" style="color:#aaa" onclick="filterLevel(0)"><span class="leg-dot" style="background:#aaa"></span>الكل</span>
+    <span class="leg-item lv1" onclick="filterLevel(1)"><span class="leg-dot" style="background:var(--lv1)"></span>مستوى 1 — أقل من 92%</span>
+    <span class="leg-item lv2" onclick="filterLevel(2)"><span class="leg-dot" style="background:var(--lv2)"></span>مستوى 2 — 92-95%</span>
+    <span class="leg-item lv3" onclick="filterLevel(3)"><span class="leg-dot" style="background:var(--lv3)"></span>مستوى 3 — 95-96%</span>
+    <span class="leg-item lv4" onclick="filterLevel(4)"><span class="leg-dot" style="background:var(--lv4)"></span>مستوى 4 — 96-99%</span>
+    <span class="leg-item lv5" onclick="filterLevel(5)"><span class="leg-dot" style="background:var(--lv5)"></span>مستوى 5 — أعلى من 99%</span>
+  </div>
+
+  <!-- Results table -->
+  <div class="results-card">
+    <div class="results-header">
+      <div>
+        <div class="results-title">📊 نتائج تقرير الحضور</div>
+        <div class="results-meta" id="resultsMeta"></div>
+      </div>
+      <div class="flex-wrap">
+        <input type="text" class="search-input" id="searchBox" placeholder="🔍 ابحث..." oninput="renderTable()">
+        <button class="btn btn-teal btn-sm" onclick="exportCSV()">⬇ CSV</button>
+        <button class="btn btn-gold btn-sm no-print" onclick="printReport()">🖨 PDF</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="res">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>اسم المعلمة</th>
+            <th>رقم الموظف</th>
+            <th>النصاب</th>
+            <th>الأسابيع</th>
+            <th>المتوقع</th>
+            <th>المُدخل</th>
+            <th>نسبة الحضور</th>
+            <th>المستوى</th>
+          </tr>
+        </thead>
+        <tbody id="resTbody">
+          <tr><td colspan="9"><div class="empty-state">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <p>أكمل الخطوات ثم انقر "احسب النتائج"</p>
+          </div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+const state = {
+  rawStaff: null,
+  rawLoad: null,
+  rawDaily: null,
+  schools: [],
+  currentSchool: null,
+  teacherInfo: [],      // [{teacher, emp_id, weekly_load, nationality, job_type}]
+  teacherDays: {},      // {name: {date: entered}}
+  schoolDays: [],       // sorted date strings present in file
+  daysInRange: [],
+  autoWeeks: 0,
+  loadOverrides: {},
+  results: [],
+  filtered: [],
+  activeLevel: 0,
+  showZero: true,
+};
+
+// ══════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════
+function norm(s) { return String(s ?? '').replace(/\s+/g, ' ').trim(); }
+
+function getWeekMonday(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function getLevel(pct) {
+  if (pct < 92) return 1; if (pct < 95) return 2;
+  if (pct < 96) return 3; if (pct <= 99) return 4; return 5;
+}
+
+function pctColor(pct) {
+  if (pct >= 99) return '#4ade80'; if (pct >= 96) return '#86efac';
+  if (pct >= 95) return '#fde047'; if (pct >= 92) return '#fdba74'; return '#fca5a5';
+}
+
+function excelDateToStr(v) {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'number') {
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return d.toISOString().slice(0, 10);
+  }
+  if (typeof v === 'string' && v.match(/\d{4}-\d{2}-\d{2}/)) return v.slice(0, 10);
+  return null;
+}
+
+// ══════════════════════════════════════════════════
+//  STEP TOGGLE
+// ══════════════════════════════════════════════════
+function toggleStep(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ══════════════════════════════════════════════════
+//  FILE HANDLING
+// ══════════════════════════════════════════════════
+function dragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId).classList.add('drag-over'); }
+function dragLeave(zoneId) { document.getElementById(zoneId).classList.remove('drag-over'); }
+function dropFile(e, type) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) loadFileToState(file, type);
+}
+
+function handleFile(e, type) {
+  const file = e.target.files[0];
+  if (file) loadFileToState(file, type);
+}
+
+function loadFileToState(file, type) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      state['raw' + type.charAt(0).toUpperCase() + type.slice(1)] = wb;
+      const zone = document.getElementById('zone-' + type);
+      zone.classList.add('loaded');
+      const ok = document.getElementById(type + '-ok');
+      const err = document.getElementById(type + '-err');
+      ok.style.display = 'block';
+      ok.textContent = '✅ ' + file.name + ' (' + wb.SheetNames.length + ' ورقة)';
+      err.style.display = 'none';
+      updateS1Status();
+    } catch(ex) {
+      const err = document.getElementById(type + '-err');
+      err.style.display = 'block';
+      err.textContent = '❌ خطأ: ' + ex.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function updateS1Status() {
+  const n = [state.rawStaff, state.rawLoad, state.rawDaily].filter(Boolean).length;
+  document.getElementById('s1status').textContent = n + '/3 ملفات جاهزة';
+}
+
+// ══════════════════════════════════════════════════
+//  PARSE FILES
+// ══════════════════════════════════════════════════
+function parseAllFiles() {
+  const status = document.getElementById('parseStatus');
+  if (!state.rawStaff || !state.rawLoad || !state.rawDaily) {
+    status.textContent = '❌ يرجى رفع الملفات الثلاثة أولاً';
+    status.style.color = '#f87171';
+    return;
+  }
+  try {
+    status.textContent = '⏳ جاري المعالجة...';
+    parseStaff();
+    parseLoad();
+    parseDaily();
+    buildSchoolList();
+    status.textContent = '✅ تمت المعالجة بنجاح';
+    status.style.color = '#34d399';
+    document.getElementById('s1num').classList.add('done');
+    document.getElementById('s1num').textContent = '';
+    document.getElementById('step1').classList.add('collapsed');
+  } catch(ex) {
+    status.textContent = '❌ ' + ex.message;
+    status.style.color = '#f87171';
+    console.error(ex);
+  }
+}
+
+function parseStaff() {
+  // Build lookup: empId -> {nationality, jobType, schoolCode, name}
+  state.staffLookup = {};
+  const wb = state.rawStaff;
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (!rows.length) throw new Error('ملف الموظفين فارغ');
+
+  // Find header row
+  let hdr = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const r = rows[i].map(v => norm(v));
+    if (r.some(v => v.includes('رقم الموظف') || v.includes('الجنسية'))) { hdr = i; break; }
+  }
+  if (hdr < 0) throw new Error('لم يُعثر على رأس جدول في ملف الموظفين');
+
+  const H = rows[hdr].map(v => norm(v));
+  const col = (k) => H.findIndex(h => h.includes(k));
+
+  const cEmp = col('رقم الموظف');
+  const cNat = col('الجنسية');
+  const cJob = col('نوع الوظيفه');
+  const cSchool = col('كود المدرسة');
+  const cName = col('اسم الموظف');
+
+  for (let i = hdr + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const eid = norm(r[cEmp]);
+    if (!eid) continue;
+    state.staffLookup[eid] = {
+      nationality: cNat >= 0 ? norm(r[cNat]) : '',
+      jobType: cJob >= 0 ? norm(r[cJob]) : '',
+      schoolCode: cSchool >= 0 ? norm(r[cSchool]) : '',
+      name: cName >= 0 ? norm(r[cName]) : '',
+    };
+  }
+}
+
+function parseLoad() {
+  state.loadData = {}; // schoolCode -> [{teacher, emp_id, weekly_load}]
+  const wb = state.rawLoad;
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  let hdr = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const r = rows[i].map(v => norm(v));
+    if (r.some(v => v.includes('اسم المعلم') || v.includes('النصاب'))) { hdr = i; break; }
+  }
+  if (hdr < 0) throw new Error('لم يُعثر على رأس جدول في ملف النصاب');
+
+  const H = rows[hdr].map(v => norm(v));
+  const col = (k) => H.findIndex(h => h.includes(k));
+
+  const cName = col('اسم المعلم');
+  const cEmp  = col('رقم الموظف');
+  const cSchool = col('رقم المدرسة');
+  // prefer "اجمالي النصاب" else "النصاب الأسبوعي"
+  let cLoad = H.findIndex(h => h.includes('اجمالي النصاب'));
+  if (cLoad < 0) cLoad = H.findIndex(h => h.includes('النصاب الأسبوعي'));
+
+  if (cName < 0 || cLoad < 0) throw new Error('أعمدة النصاب غير موجودة');
+
+  for (let i = hdr + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const name = norm(r[cName]);
+    if (!name) continue;
+    const school = cSchool >= 0 ? norm(r[cSchool]) : 'UNKNOWN';
+    const emp = cEmp >= 0 ? norm(r[cEmp]) : '';
+    const load = parseInt(r[cLoad]) || 0;
+    if (!state.loadData[school]) state.loadData[school] = [];
+    state.loadData[school].push({ teacher: name, emp_id: emp, weekly_load: load });
+  }
+}
+
+function parseDaily() {
+  state.dailyData = {}; // schoolCode -> teacherDays + schoolDays
+  const wb = state.rawDaily;
+
+  // Process each sheet that looks like a school code
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', cellDates: true });
+
+    // Find header row with "اسم المعلم" or "التاريخ"
+    let hdr = -1;
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+      const r = rows[i].map(v => norm(v));
+      if (r.some(v => v === 'اسم المعلم' || v === 'التاريخ')) { hdr = i; break; }
+    }
+    if (hdr < 0) continue;
+
+    const H = rows[hdr].map(v => norm(v));
+    // teacher col
+    const cTeacher = H.findIndex(h => h === 'اسم المعلم');
+    const cDate    = H.findIndex(h => h === 'التاريخ');
+    if (cTeacher < 0 || cDate < 0) continue;
+
+    // lesson cols: حصة 1 through حصة 8
+    const lessonCols = H.reduce((acc, h, i) => {
+      if (h.startsWith('حصة')) acc.push(i);
+      return acc;
+    }, []);
+    if (lessonCols.length === 0) continue;
+
+    const teacherDays = {};
+    const datesSet = new Set();
+
+    for (let i = hdr + 1; i < rows.length; i++) {
+      const r = rows[i];
+      const teacher = norm(r[cTeacher]);
+      if (!teacher) continue;
+
+      const rawDate = r[cDate];
+      const dateStr = excelDateToStr(rawDate);
+      if (!dateStr) continue;
+
+      datesSet.add(dateStr);
+      const entered = lessonCols.filter(c => r[c] !== '' && r[c] !== null && r[c] !== undefined).length;
+
+      if (!teacherDays[teacher]) teacherDays[teacher] = {};
+      teacherDays[teacher][dateStr] = (teacherDays[teacher][dateStr] || 0) + entered;
+    }
+
+    const schoolCode = sheetName.trim();
+    state.dailyData[schoolCode] = {
+      teacherDays,
+      schoolDays: Array.from(datesSet).sort()
+    };
+  }
+
+  if (Object.keys(state.dailyData).length === 0)
+    throw new Error('لم يُعثر على بيانات في ملف التقرير اليومي');
+}
+
+function buildSchoolList() {
+  // Union of schools across load + daily
+  const schools = new Set([
+    ...Object.keys(state.loadData || {}),
+    ...Object.keys(state.dailyData || {})
+  ]);
+  state.schools = Array.from(schools).filter(s => s && s !== 'UNKNOWN');
+
+  const sel = document.getElementById('schoolCode');
+  sel.innerHTML = '<option value="">— اختر —</option>';
+  state.schools.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+
+  // Auto-select if only one school
+  if (state.schools.length === 1) {
+    sel.value = state.schools[0];
+    onSchoolChange();
+  }
+
+  document.getElementById('schoolSelector').style.display = 'block';
+  document.getElementById('s1status').textContent = '✅ ' + state.schools.length + ' مدرسة';
+}
+
+function onSchoolChange() {
+  const code = document.getElementById('schoolCode').value;
+  if (!code) return;
+  state.currentSchool = code;
+
+  const loadRows = state.loadData[code] || [];
+  const dailyData = state.dailyData[code] || { teacherDays: {}, schoolDays: [] };
+
+  // Merge teacher names (normalize spaces)
+  const normTeachersFromDays = {};
+  for (const [k, v] of Object.entries(dailyData.teacherDays)) {
+    normTeachersFromDays[norm(k)] = v;
+  }
+
+  state.teacherInfo = loadRows.map(t => {
+    const nName = norm(t.teacher);
+    const staffInfo = state.staffLookup[t.emp_id] || {};
+    return {
+      teacher: nName,
+      emp_id: t.emp_id,
+      weekly_load: t.weekly_load,
+      nationality: staffInfo.nationality || '',
+      job_type: staffInfo.jobType || '',
+    };
+  });
+
+  // Add extra teachers from daily not in load
+  const loadNamesNorm = new Set(state.teacherInfo.map(t => t.teacher));
+  for (const [normName, days] of Object.entries(normTeachersFromDays)) {
+    if (!loadNamesNorm.has(normName)) {
+      state.teacherInfo.push({ teacher: normName, emp_id: '', weekly_load: 0, nationality: '', job_type: '' });
+    }
+  }
+
+  state.teacherDays = normTeachersFromDays;
+  state.schoolDays = dailyData.schoolDays;
+  state.loadOverrides = {};
+
+  const info = `${state.teacherInfo.length} معلمة · ${state.schoolDays.length} يوم (${state.schoolDays[0] || '—'} → ${state.schoolDays[state.schoolDays.length-1] || '—'})`;
+  document.getElementById('schoolInfo').textContent = info;
+
+  // Set date range inputs
+  if (state.schoolDays.length) {
+    document.getElementById('startDate').value = state.schoolDays[0];
+    document.getElementById('endDate').value = state.schoolDays[state.schoolDays.length-1];
+    document.getElementById('startDate').min = state.schoolDays[0];
+    document.getElementById('startDate').max = state.schoolDays[state.schoolDays.length-1];
+    document.getElementById('endDate').min = state.schoolDays[0];
+    document.getElementById('endDate').max = state.schoolDays[state.schoolDays.length-1];
+  }
+
+  applyDates();
+  document.getElementById('step2').classList.remove('collapsed');
+  document.getElementById('s2num').classList.add('done');
+  document.getElementById('s2num').textContent = '';
+  document.getElementById('s2status').textContent = '✅ جاهز';
+}
+
+// ══════════════════════════════════════════════════
+//  STEP 2: DATES & WEEKS
+// ══════════════════════════════════════════════════
+function onDatesChange() { /* just update on apply */ }
+
+function applyDates() {
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+  if (!s || !e || !state.schoolDays.length) return;
+  if (s > e) { alert('تاريخ البداية يجب أن يكون قبل تاريخ النهاية'); return; }
+
+  state.daysInRange = state.schoolDays.filter(d => d >= s && d <= e);
+  if (!state.daysInRange.length) { alert('لا توجد أيام في هذه الفترة'); return; }
+
+  const weeksSet = new Set(state.daysInRange.map(d => getWeekMonday(d)));
+  state.autoWeeks = weeksSet.size;
+
+  document.getElementById('dateInfo').innerHTML =
+    `<span class="tag tag-blue">${state.daysInRange.length} يوم في الفترة</span>
+     <span style="color:var(--muted);margin:0 6px">|</span>
+     <span class="tag tag-teal">${state.autoWeeks} أسبوع تلقائي</span>
+     <span style="color:var(--muted);margin:0 6px">|</span>
+     <b style="color:#4ade80">${getEffWeeks()}</b> أسبوع معتمد`;
+
+  document.getElementById('weeksAutoChip').textContent = 'تلقائي: ' + state.autoWeeks + ' أسبوع';
+  document.getElementById('weeksBox').style.display = 'block';
+  updateWeeksChip();
+  buildLoadTable();
+
+  document.getElementById('step3').classList.remove('collapsed');
+  document.getElementById('s3num').classList.add('done');
+  document.getElementById('s3num').textContent = '';
+  document.getElementById('s3status').textContent = '✅ ' + getEffWeeks() + ' أسبوع';
+}
+
+function getEffWeeks() {
+  const v = parseInt(document.getElementById('weeksOverride').value);
+  return (!isNaN(v) && v > 0) ? v : state.autoWeeks;
+}
+
+function onWeeksChange() { updateWeeksChip(); refreshLoadExpected(); refreshDateInfo(); }
+function resetWeeks() { document.getElementById('weeksOverride').value = ''; onWeeksChange(); }
+
+function updateWeeksChip() {
+  const eff = getEffWeeks();
+  const v = document.getElementById('weeksOverride').value;
+  const chip = document.getElementById('weeksUsedChip');
+  chip.style.display = 'inline';
+  const manual = v !== '' && parseInt(v) > 0;
+  chip.className = 'weeks-chip ' + (manual ? 'manual' : 'auto');
+  chip.textContent = (manual ? '✏️ ' : '✅ ') + 'المعتمد: ' + eff + ' أسبوع';
+}
+
+function refreshDateInfo() {
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+  if (!state.daysInRange.length) return;
+  document.getElementById('dateInfo').innerHTML =
+    `<span class="tag tag-blue">${state.daysInRange.length} يوم في الفترة</span>
+     <span style="color:var(--muted);margin:0 6px">|</span>
+     <span class="tag tag-teal">${state.autoWeeks} أسبوع تلقائي</span>
+     <span style="color:var(--muted);margin:0 6px">|</span>
+     <b style="color:#4ade80">${getEffWeeks()}</b> أسبوع معتمد`;
+}
+
+// ══════════════════════════════════════════════════
+//  STEP 3: LOAD TABLE
+// ══════════════════════════════════════════════════
+function buildLoadTable() {
+  const eff = getEffWeeks();
+  document.getElementById('loadWeeksNote').textContent = '× ' + eff + ' أسبوع';
+  const tbody = document.getElementById('loadTbody');
+  tbody.innerHTML = state.teacherInfo.map((t, i) => {
+    const isZero = t.weekly_load === 0;
+    const cur = state.loadOverrides[t.teacher] !== undefined ? state.loadOverrides[t.teacher] : t.weekly_load;
+    const exp = cur * eff;
+    return `<tr class="${isZero ? 'zero-load' : ''}" data-zero="${isZero}">
+      <td style="color:var(--muted);font-size:0.73rem">${i+1}</td>
+      <td>${t.teacher}</td>
+      <td>${t.emp_id || '—'}</td>
+      <td><span class="num-badge">${t.weekly_load}</span></td>
+      <td><input type="number" class="load-input${state.loadOverrides[t.teacher]!==undefined?' mod':''}"
+        id="li_${i}" value="${cur}" min="0" max="60"
+        data-orig="${t.weekly_load}" oninput="onLoadChange(this,${i})"></td>
+      <td id="lexp_${i}">${exp > 0 ? exp + ' حصة' : '—'}</td>
+    </tr>`;
+  }).join('');
+  updateModCount();
+}
+
+function refreshLoadExpected() {
+  const eff = getEffWeeks();
+  document.getElementById('loadWeeksNote').textContent = '× ' + eff + ' أسبوع';
+  state.teacherInfo.forEach((t, i) => {
+    const cur = state.loadOverrides[t.teacher] !== undefined ? state.loadOverrides[t.teacher] : t.weekly_load;
+    const el = document.getElementById('lexp_' + i);
+    if (el) el.textContent = cur * eff > 0 ? (cur * eff) + ' حصة' : '—';
+  });
+}
+
+function onLoadChange(input, idx) {
+  const t = state.teacherInfo[idx];
+  const val = parseInt(input.value) || 0;
+  const orig = parseInt(input.dataset.orig);
+  if (val !== orig) { input.classList.add('mod'); state.loadOverrides[t.teacher] = val; }
+  else { input.classList.remove('mod'); delete state.loadOverrides[t.teacher]; }
+  const eff = getEffWeeks();
+  const el = document.getElementById('lexp_' + idx);
+  if (el) el.textContent = val * eff > 0 ? (val * eff) + ' حصة' : '—';
+  updateModCount();
+}
+
+function updateModCount() {
+  const n = Object.keys(state.loadOverrides).length;
+  document.getElementById('modCount').textContent = n > 0 ? `✏️ تم تعديل نصاب ${n} معلمة` : '';
+}
+
+function resetLoads() { state.loadOverrides = {}; buildLoadTable(); }
+
+function toggleZeroRows() {
+  state.showZero = !state.showZero;
+  document.querySelectorAll('#loadTbody tr[data-zero="true"]').forEach(r => {
+    r.style.display = state.showZero ? '' : 'none';
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  CALCULATE
+// ══════════════════════════════════════════════════
+function calculate() {
+  if (!state.daysInRange.length) { alert('يرجى تطبيق الفترة أولاً'); return; }
+  const eff = getEffWeeks();
+  if (!eff) { alert('عدد الأسابيع غير صحيح'); return; }
+
+  state.results = state.teacherInfo.map(t => {
+    const tDays = state.teacherDays[t.teacher] || {};
+    const load = state.loadOverrides[t.teacher] !== undefined ? state.loadOverrides[t.teacher] : t.weekly_load;
+    const expected = load * eff;
+    let entered = 0;
+    for (const day of state.daysInRange) {
+      if (tDays[day] !== undefined) entered += tDays[day];
+    }
+    const pct = expected > 0 ? (entered / expected) * 100 : 0;
+    return { ...t, weekly_load: load, total_expected: expected, total_entered: entered, pct, level: getLevel(pct), eff_weeks: eff };
+  }).sort((a, b) => b.pct - a.pct);
+
+  // Stats
+  const active = state.results.filter(r => r.total_expected > 0);
+  const avg = active.length ? active.reduce((s, r) => s + r.pct, 0) / active.length : 0;
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+
+  document.getElementById('statsGrid').innerHTML = [
+    { num: active.length, label: 'إجمالي المعلمين', color: 'var(--accent)' },
+    { num: state.daysInRange.length, label: 'أيام في الفترة', color: '#38bdf8' },
+    { num: eff, label: 'الأسابيع المعتمدة', color: '#4ade80' },
+    { num: avg.toFixed(1) + '%', label: 'متوسط الحضور', color: '#a78bfa' },
+    { num: state.results.filter(r => r.level===1 && r.total_expected>0).length, label: 'مستوى 1', color: '#fca5a5' },
+    { num: state.results.filter(r => r.level===2 && r.total_expected>0).length, label: 'مستوى 2', color: '#fdba74' },
+    { num: state.results.filter(r => r.level===3 && r.total_expected>0).length, label: 'مستوى 3', color: '#fde047' },
+    { num: state.results.filter(r => r.level===4 && r.total_expected>0).length, label: 'مستوى 4', color: '#86efac' },
+    { num: state.results.filter(r => r.level===5 && r.total_expected>0).length, label: 'مستوى 5', color: '#4ade80' },
+  ].map(x => `<div class="stat-card"><div class="stat-num" style="color:${x.color}">${x.num}</div><div class="stat-label">${x.label}</div></div>`).join('');
+
+  document.getElementById('resultsMeta').textContent =
+    `${state.currentSchool || ''} · الفترة: ${s} → ${e} · ${eff} أسبوع · ${state.daysInRange.length} يوم`;
+
+  // Print meta
+  document.getElementById('printTitle').textContent = `تقرير حضور المعلمين — مدرسة ${state.currentSchool || ''}`;
+  document.getElementById('printMeta').textContent =
+    `الفترة: ${s} → ${e} · الأسابيع المعتمدة: ${eff} · الأيام: ${state.daysInRange.length} · إجمالي المعلمين: ${active.length}`;
+
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  state.activeLevel = 0;
+  renderTable();
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER TABLE
+// ══════════════════════════════════════════════════
+function filterLevel(level) {
+  state.activeLevel = level;
+  document.querySelectorAll('.leg-item').forEach((el, i) => el.classList.toggle('active', i === level));
+  renderTable();
+}
+
+function renderTable() {
+  const search = document.getElementById('searchBox').value.trim();
+  state.filtered = state.results.filter(r => {
+    if (state.activeLevel > 0 && r.level !== state.activeLevel) return false;
+    if (search && !r.teacher.includes(search)) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('resTbody');
+  if (!state.filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><p>لا توجد نتائج مطابقة</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = state.filtered.map((r, idx) => {
+    const pctD = r.total_expected > 0 ? r.pct.toFixed(2) + '%' : '—';
+    const bw = Math.min(r.pct, 100);
+    const bc = pctColor(r.pct);
+    const mod = state.loadOverrides[r.teacher] !== undefined;
+    return `<tr>
+      <td>${idx+1}</td>
+      <td>${r.teacher}${mod ? '<span class="mod-star">✏</span>' : ''}</td>
+      <td>${r.emp_id || '—'}</td>
+      <td>${r.weekly_load || '—'}</td>
+      <td style="color:#4ade80;font-weight:700">${r.eff_weeks}</td>
+      <td>${r.total_expected || '—'}</td>
+      <td><b>${r.total_entered}</b></td>
+      <td>
+        <div class="bar-wrap">
+          <div class="bar"><div class="bar-fill" style="width:${bw}%;background:${bc}"></div></div>
+          <span class="pct-txt" style="color:${bc}">${pctD}</span>
+        </div>
+      </td>
+      <td><span class="lv-badge lv${r.level}">مستوى ${r.level}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════
+function exportCSV() {
+  if (!state.results.length) { alert('احسب النتائج أولاً'); return; }
+  // Use all results if filtered is empty (before any filter applied)
+  const data = state.filtered.length ? state.filtered : state.results;
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+  const eff = getEffWeeks();
+  const rows = [
+    [`المدرسة: ${state.currentSchool || ''}`, `الفترة: ${s} - ${e}`, `الأسابيع: ${eff}`, `الأيام: ${state.daysInRange.length}`, '', '', '', '', '', ''],
+    ['اسم المعلمة','رقم الموظف','النصاب','نصاب معدّل','الأسابيع','المتوقع','المدخل','النسبة','المستوى'],
+    ...data.map(r => [
+      r.teacher, r.emp_id || '', r.weekly_load,
+      state.loadOverrides[r.teacher] !== undefined ? 'نعم' : 'لا',
+      r.eff_weeks, r.total_expected, r.total_entered,
+      r.total_expected > 0 ? r.pct.toFixed(2) + '%' : '0%',
+      'مستوى ' + r.level
+    ])
+  ];
+  const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  // Build a data URI and open in new tab for download (works in sandboxed iframes)
+  const b64 = btoa(unescape(encodeURIComponent(csv)));
+  const dataUri = 'data:text/csv;charset=utf-8;base64,' + b64;
+  const fname = `تقرير_حضور_${(state.currentSchool || 'المدرسة')}_${s}_${e}.csv`;
+  // Try direct download first, fall back to new window
+  try {
+    const a = document.createElement('a');
+    a.href = dataUri;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch(err) {
+    // Fallback: open in new window so user can save manually
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write('<pre style="direction:rtl;font-family:monospace;font-size:12px">' + csv.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</pre>');
+      w.document.title = fname;
+    } else {
+      showCSVModal(csv, fname);
+    }
+  }
+}
+
+function showCSVModal(csv, fname) {
+  // Last resort: show in a modal for copy-paste
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;direction:rtl';
+  modal.innerHTML = `
+    <div style="background:#0d1b2e;border:1px solid rgba(79,156,249,0.3);border-radius:16px;padding:24px;max-width:700px;width:100%;max-height:80vh;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;color:#e2eaf4">📄 ${fname}</span>
+        <button onclick="this.closest('div').parentElement.remove()" style="background:#ef4444;border:none;color:#fff;border-radius:6px;padding:4px 12px;cursor:pointer;font-family:Tajawal,sans-serif">إغلاق</button>
+      </div>
+      <p style="font-size:0.8rem;color:#7a99bb">انسخ المحتوى أدناه وألصقه في Excel أو Notepad واحفظه بامتداد .csv</p>
+      <textarea style="flex:1;min-height:300px;background:#060d1a;color:#4f9cf9;border:1px solid rgba(79,156,249,0.2);border-radius:8px;padding:10px;font-family:monospace;font-size:11px;resize:vertical;direction:ltr" readonly>${csv}</textarea>
+      <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(()=>{this.textContent='✅ تم النسخ!';setTimeout(()=>this.textContent='📋 نسخ الكل',2000)})" style="background:linear-gradient(135deg,#4f9cf9,#2563eb);border:none;color:#fff;border-radius:9px;padding:10px;cursor:pointer;font-family:Tajawal,sans-serif;font-weight:700;font-size:0.9rem">📋 نسخ الكل</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function printReport() {
+  if (!state.results.length) { alert('احسب النتائج أولاً'); return; }
+  const data = state.filtered.length ? state.filtered : state.results;
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+  const eff = getEffWeeks();
+
+  const lvColor = ['','#dc2626','#ea580c','#ca8a04','#16a34a','#15803d'];
+  const lvBg    = ['','#fef2f2','#fff7ed','#fefce8','#f0fdf4','#dcfce7'];
+  const lvLabel = ['','أقل من 92%','92-95%','95-96%','96-99%','أعلى من 99%'];
+
+  const rows = data.map((r, i) => {
+    const pct = r.total_expected > 0 ? r.pct.toFixed(2) + '%' : '—';
+    const c = lvColor[r.level]; const bg = lvBg[r.level];
+    return `<tr style="background:${i%2===0?'#fff':'#f9fafb'}">
+      <td>${i+1}</td>
+      <td style="text-align:right;font-weight:600">${r.teacher}</td>
+      <td>${r.emp_id||'—'}</td>
+      <td>${r.weekly_load||'—'}</td>
+      <td style="color:#16a34a;font-weight:700">${r.eff_weeks}</td>
+      <td>${r.total_expected||'—'}</td>
+      <td><b>${r.total_entered}</b></td>
+      <td style="font-weight:700;color:${c}">${pct}</td>
+      <td><span style="background:${bg};color:${c};border:1px solid ${c};border-radius:12px;padding:2px 10px;font-weight:700;font-size:11px">مستوى ${r.level}</span></td>
+    </tr>`;
+  }).join('');
+
+  const lvStats = [1,2,3,4,5].map(l => {
+    const n = data.filter(r=>r.level===l).length;
+    return `<div style="text-align:center;background:${lvBg[l]};border:1px solid ${lvColor[l]};border-radius:10px;padding:10px 16px;min-width:90px">
+      <div style="font-size:1.6rem;font-weight:900;color:${lvColor[l]}">${n}</div>
+      <div style="font-size:11px;color:#666">مستوى ${l}<br>${lvLabel[l]}</div>
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تقرير حضور المعلمين</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Tajawal',sans-serif; direction:rtl; padding:20px; color:#1a2636; background:#fff; }
+  .hdr { border-bottom:3px solid #0f2544; padding-bottom:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .hdr-title { font-size:1.4rem; font-weight:900; color:#0f2544; }
+  .hdr-meta { font-size:0.78rem; color:#6b7f96; text-align:left; }
+  .stats { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  thead th { background:#0f2544; color:#fff; padding:9px 8px; text-align:center; white-space:nowrap; }
+  thead th:nth-child(2) { text-align:right; }
+  tbody td { padding:7px 8px; border-bottom:1px solid #e5e7eb; text-align:center; vertical-align:middle; }
+  tbody td:nth-child(2) { text-align:right; }
+  .footer { margin-top:14px; font-size:10px; color:#999; text-align:center; border-top:1px solid #eee; padding-top:8px; }
+  @page { size:A4 landscape; margin:12mm 10mm; }
+  @media print { body { padding:0; } }
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="hdr-title">📊 تقرير حضور المعلمين — ${state.currentSchool||''}</div>
+    <div style="font-size:0.82rem;color:#6b7f96;margin-top:3px">الفترة: ${s} → ${e} &nbsp;|&nbsp; الأسابيع المعتمدة: ${eff} &nbsp;|&nbsp; الأيام: ${state.daysInRange.length} &nbsp;|&nbsp; إجمالي المعلمين: ${data.length}</div>
+  </div>
+  <div style="font-size:10px;color:#999">${new Date().toLocaleDateString('ar-AE')}</div>
+</div>
+<div class="stats">${lvStats}</div>
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>اسم المعلمة</th><th>رقم الموظف</th>
+      <th>النصاب</th><th>الأسابيع</th><th>المتوقع</th><th>المُدخل</th>
+      <th>نسبة الحضور</th><th>المستوى</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">تم إنشاء التقرير بواسطة نظام حضور المعلمين &nbsp;·&nbsp; ${new Date().toLocaleString('ar-AE')}</div>
+</body></html>`;
+
+  // Open in new window and auto-print
+  const win = window.open('', '_blank', 'width=1100,height=750');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+    win.onload = function() { win.focus(); win.print(); };
+  } else {
+    // Fallback: data URI
+    const b64 = btoa(unescape(encodeURIComponent(html)));
+    const uri = 'data:text/html;charset=utf-8;base64,' + b64;
+    const a = document.createElement('a');
+    a.href = uri;
+    a.download = `تقرير_حضور_${state.currentSchool||''}_${s}_${e}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    alert('تم تنزيل ملف HTML — افتحه ثم اطبعه أو احفظه كـ PDF من المتصفح (Ctrl+P)');
+  }
+}
+
+function resetAll() {
+  ['rawStaff','rawLoad','rawDaily','staffLookup','loadData','dailyData'].forEach(k => state[k] = null);
+  state.schools = []; state.currentSchool = null; state.teacherInfo = [];
+  state.teacherDays = {}; state.schoolDays = []; state.daysInRange = [];
+  state.loadOverrides = {}; state.results = []; state.filtered = [];
+  state.autoWeeks = 0;
+  ['zone-staff','zone-load','zone-daily'].forEach(id => {
+    document.getElementById(id).classList.remove('loaded','drag-over');
+  });
+  ['staff','load','daily'].forEach(t => {
+    document.getElementById(t+'-ok').style.display='none';
+    document.getElementById(t+'-err').style.display='none';
+  });
+  document.getElementById('parseStatus').textContent='';
+  document.getElementById('schoolSelector').style.display='none';
+  document.getElementById('weeksBox').style.display='none';
+  document.getElementById('dateInfo').textContent='';
+  document.getElementById('resultsSection').style.display='none';
+  document.getElementById('loadTbody').innerHTML='';
+  document.getElementById('resTbody').innerHTML=`<tr><td colspan="9"><div class="empty-state"><p>أكمل الخطوات ثم انقر احسب</p></div></td></tr>`;
+  ['s1num','s2num','s3num'].forEach(id => {
+    document.getElementById(id).classList.remove('done');
+  });
+  document.getElementById('s1num').textContent='1';
+  document.getElementById('s2num').textContent='2';
+  document.getElementById('s3num').textContent='3';
+  document.getElementById('s1status').textContent='لم تُرفع ملفات بعد';
+  document.getElementById('s2status').textContent='في انتظار الخطوة 1';
+  document.getElementById('s3status').textContent='في انتظار الخطوة 2';
+  updateS1Status();
+}
+</script>
+</body>
+</html>
