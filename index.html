@@ -1427,13 +1427,12 @@
 @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 </style>
 
-<!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, writeBatch, getDoc }
-  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-const firebaseConfig = {
+<!-- Firebase SDK (CDN compat – works everywhere including GitHub Pages) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+// ── Firebase Init ──────────────────────────────────────────────────
+const _firebaseConfig = {
   apiKey: "AIzaSyDOpDe4E_t6ILciTXQKu4JBKY0l905_SWQ",
   authDomain: "school-a-c3ce0.firebaseapp.com",
   projectId: "school-a-c3ce0",
@@ -1441,21 +1440,37 @@ const firebaseConfig = {
   messagingSenderId: "108137648845",
   appId: "1:108137648845:web:693afcbf486646eb3d8f84"
 };
+firebase.initializeApp(_firebaseConfig);
+const _db = firebase.firestore();
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
-
-// ── Expose DB helpers to global scope ──────────────────────────────
-window._db = db;
-window._col = (name) => collection(db, name);
+// ── Save helpers ───────────────────────────────────────────────────
+window.dbSaveTask = async (task) => {
+  await _db.collection('tasks').doc(String(task.id)).set({...task});
+};
+window.dbDeleteTask = async (id) => {
+  await _db.collection('tasks').doc(String(id)).delete();
+};
+window.dbSaveStaff = async (staff, fid) => {
+  const id = fid || 'staff_' + Date.now();
+  await _db.collection('staff').doc(id).set({...staff, _fid: id});
+  return id;
+};
+window.dbDeleteStaff = async (fid) => {
+  await _db.collection('staff').doc(fid).delete();
+};
+window.dbSaveSettings = async () => {
+  await _db.collection('settings').doc('main').set({
+    termDates: window.TERM_DATES,
+    emailLog: window.emailLog.slice(-50)
+  });
+};
 
 // ── Real-time listeners ────────────────────────────────────────────
-function startListeners() {
+function _startListeners() {
   // TASKS
-  onSnapshot(collection(db,'tasks'), snap => {
+  _db.collection('tasks').onSnapshot(snap => {
     window.TASKS.length = 0;
     snap.forEach(d => window.TASKS.push({...d.data(), id: d.id}));
-    // sort by createdAt
     window.TASKS.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
     if(window._appReady) {
       window.renderDashboard();
@@ -1469,10 +1484,10 @@ function startListeners() {
         if(pid==='reports') window.renderReportsPage();
       }
     }
-  });
+  }, err => console.error('Tasks listener:', err));
 
   // STAFF
-  onSnapshot(collection(db,'staff'), snap => {
+  _db.collection('staff').onSnapshot(snap => {
     window.STAFF.length = 0;
     snap.forEach(d => window.STAFF.push({...d.data(), _fid: d.id}));
     window.STAFF.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
@@ -1482,11 +1497,11 @@ function startListeners() {
       const active = document.querySelector('.page.active');
       if(active && active.id==='page-staff') window.renderStaffPage();
     }
-  });
+  }, err => console.error('Staff listener:', err));
 
-  // SETTINGS (term dates, emailLog)
-  onSnapshot(doc(db,'settings','main'), snap => {
-    if(snap.exists()){
+  // SETTINGS
+  _db.collection('settings').doc('main').onSnapshot(snap => {
+    if(snap.exists){
       const d = snap.data();
       if(d.termDates)  Object.assign(window.TERM_DATES, d.termDates);
       if(d.emailLog)   { window.emailLog.length=0; window.emailLog.push(...d.emailLog); }
@@ -1497,39 +1512,15 @@ function startListeners() {
       const active = document.querySelector('.page.active');
       if(active && active.id==='page-terms') window.renderTermsPage();
     }
-  });
+  }, err => console.error('Settings listener:', err));
 }
 
-// ── Save helpers ───────────────────────────────────────────────────
-window.dbSaveTask = async (task) => {
-  const ref = doc(db, 'tasks', String(task.id));
-  await setDoc(ref, {...task});
-};
-window.dbDeleteTask = async (id) => {
-  await deleteDoc(doc(db, 'tasks', String(id)));
-};
-window.dbSaveStaff = async (staff, fid) => {
-  const id = fid || 'staff_' + Date.now();
-  await setDoc(doc(db,'staff', id), {...staff, _fid: id});
-  return id;
-};
-window.dbDeleteStaff = async (fid) => {
-  await deleteDoc(doc(db,'staff', fid));
-};
-window.dbSaveSettings = async () => {
-  await setDoc(doc(db,'settings','main'), {
-    termDates: window.TERM_DATES,
-    emailLog: window.emailLog.slice(-50) // keep last 50
-  });
-};
-
 // ── Boot ───────────────────────────────────────────────────────────
-async function boot() {
-  try {
-    document.getElementById('db-loading-msg').textContent = 'جاري تحميل البيانات...';
-    startListeners();
-    // Wait a moment for first snapshot flush
-    await new Promise(r => setTimeout(r, 1800));
+function _boot() {
+  document.getElementById('db-loading-msg').textContent = 'جاري تحميل البيانات...';
+  _startListeners();
+  // Give Firestore 2 seconds to flush first snapshot, then show app
+  setTimeout(() => {
     document.getElementById('db-loading').style.display = 'none';
     window._appReady = true;
     window.renderDashboard();
@@ -1540,12 +1531,11 @@ async function boot() {
     window.renderTermInfoBar();
     window.updateHeaderYear();
     window.showToast('✅ تم الاتصال بقاعدة البيانات', 'success');
-  } catch(e) {
-    document.getElementById('db-loading-msg').textContent = '❌ فشل الاتصال: ' + e.message;
-    console.error(e);
-  }
+  }, 2000);
 }
-boot();
+
+// Run after main script is ready
+window.addEventListener('load', _boot);
 </script>
 
 <script>
