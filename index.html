@@ -3088,4 +3088,245 @@ function renderReportsPage() {
   // ── Detailed table ──
   html += `<div class="card" style="padding:0;overflow:hidden;margin-bottom:20px">
     <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-  
+      <div class="card-title">📋 تفاصيل جميع الإجراءات</div>
+      <div style="display:flex;gap:8px">
+        <select class="filter-select" id="report-filter-std" onchange="renderReportsPage()">
+          <option value="">جميع المعايير</option>
+          ${[1,2,3,4,5,6].map(s=>`<option value="${s}">${STD_ICONS[s]} معيار ${s}</option>`).join('')}
+        </select>
+        <select class="filter-select" id="report-filter-status" onchange="renderReportsPage()">
+          <option value="">جميع الحالات</option>
+          <option value="Achieved">✅ منجز</option>
+          <option value="In Progress">🔄 قيد التنفيذ</option>
+          <option value="Delayed">🔴 متأخر</option>
+        </select>
+      </div>
+    </div>
+    <table class="tasks-table">
+      <thead><tr><th>#</th><th>البرنامج / الإجراء</th><th>المسؤول</th><th>المعيار</th><th>ف1</th><th>ف2</th><th>ف3</th></tr></thead>
+      <tbody>`;
+
+  const filterStd    = document.getElementById('report-filter-std')?.value || '';
+  const filterStatus = document.getElementById('report-filter-status')?.value || '';
+  let filtered = TASKS;
+  if(filterStd)    filtered = filtered.filter(t=>String(t.std)===filterStd);
+  if(filterStatus) filtered = filtered.filter(t=>t.term3===filterStatus);
+
+  filtered.forEach((t,i)=>{
+    html += `<tr>
+      <td style="color:var(--text-light);font-size:11px">${i+1}</td>
+      <td><div class="task-name">${t.name}</div><div class="task-sub">${t.desc||''}</div></td>
+      <td><span class="person-chip">${(t.person||'—').split('/')[0].trim()}</span></td>
+      <td><span style="font-size:11px;background:#e8f0fb;color:var(--primary);padding:3px 8px;border-radius:6px;font-weight:700">${STD_ICONS[t.std]||''} ${t.std}</span></td>
+      <td>${statusBadge(t.term1)}</td>
+      <td>${statusBadge(t.term2)}</td>
+      <td>${statusBadge(t.term3)}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+
+  // ── Email log ──
+  if(emailLog.length) {
+    html += `<div class="card"><div class="card-header"><div class="card-title">📬 سجل المراسلات (${emailLog.length} رسالة)</div></div>`;
+    html += emailLog.slice().reverse().slice(0,20).map(e=>`
+      <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start">
+        <span style="font-size:16px">📧</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${e.to}</div>
+          <div style="font-size:11px;color:var(--primary-light)">${e.subject}</div>
+          <div style="font-size:11px;color:var(--text-light);margin-top:2px">${e.time}</div>
+        </div>
+        <span class="badge achieved" style="white-space:nowrap">مُرسلة</span>
+      </div>`).join('');
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function exportReportExcel() {
+  if(!TASKS.length){ showToast('لا توجد بيانات للتصدير','warning'); return; }
+
+  const rows = [
+    ['#','البرنامج','الوصف','المسؤول','البريد الإلكتروني','المعيار','الجدول الزمني','الهدف','ف1','ف2','ف3'],
+    ...TASKS.map((t,i)=>[
+      i+1, t.name||'', t.desc||'', t.person||'', t.email||'',
+      `المعيار ${t.std}`, t.timeline||'', t.goal||'',
+      t.term1||'', t.term2||'', t.term3||''
+    ])
+  ];
+
+  let csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  // Add BOM for Arabic in Excel
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `تقرير_الخطة_التشغيلية_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},500);
+  showToast('✅ تم تصدير ملف Excel بنجاح','success');
+}
+
+// ── Expose all render/nav functions to Firebase module scope ──────
+window.renderDashboard      = renderDashboard;
+window.renderCalendar       = renderCalendar;
+window.renderAlerts         = renderAlerts;
+window.renderTasksTable     = renderTasksTable;
+window.renderStdPage        = renderStdPage;
+window.renderStaffPage      = renderStaffPage;
+window.renderTermsPage      = renderTermsPage;
+window.renderReportsPage    = renderReportsPage;
+window.renderTermInfoBar    = renderTermInfoBar;
+window.updateNavBadges      = updateNavBadges;
+window.updateStaffNavBadge  = updateStaffNavBadge;
+window.refreshEmailDropdowns= refreshEmailDropdowns;
+window.showToast            = showToast;
+window.TERM_DATES           = TERM_DATES;
+window.TERM_COLORS          = TERM_COLORS;
+window.STD_ICONS            = STD_ICONS;
+window.STD_NAMES            = STD_NAMES;
+window.statusBadge          = statusBadge;
+window.updateHeaderYear     = updateHeaderYear;
+
+// ===============================
+// HEADER YEAR LABEL
+// ===============================
+function updateHeaderYear() {
+  const el = document.getElementById('header-year-label');
+  if(!el) return;
+  const t1 = TERM_DATES[1];
+  const t3 = TERM_DATES[3];
+  if(t1 && t1.start && t3 && t3.end) {
+    const y1 = new Date(t1.start).getFullYear();
+    const y2 = new Date(t3.end).getFullYear();
+    const yearStr = y1 === y2 ? String(y1) : `${y1}-${y2}`;
+    el.textContent = `مكتب عمليات المدرسية 2 • ${yearStr}`;
+  } else if(t1 && t1.start) {
+    const y1 = new Date(t1.start).getFullYear();
+    el.textContent = `مكتب عمليات المدرسية 2 • ${y1}`;
+  } else {
+    el.textContent = 'مكتب عمليات المدرسية 2';
+  }
+}
+
+// ===============================
+// PASSWORD LOCK
+// ===============================
+(function(){
+  const PASS = '570632';
+  const SESSION_KEY = 'khy_auth';
+  let attempts = 0;
+  let locked = false;
+
+  function unlock() {
+    const screen = document.getElementById('lockScreen');
+    if(screen) {
+      screen.style.animation = 'fadeOut 0.4s ease forwards';
+      setTimeout(()=>{ screen.style.display='none'; }, 400);
+    }
+    sessionStorage.setItem(SESSION_KEY,'1');
+  }
+
+  if(sessionStorage.getItem(SESSION_KEY)==='1') {
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const s = document.getElementById('lockScreen');
+      if(s) s.style.display='none';
+    });
+  }
+
+  window.checkPassword = function() {
+    if(locked) return;
+    const input = document.getElementById('lockInput');
+    const err   = document.getElementById('lockErr');
+    if(!input) return;
+    const val = input.value.trim();
+    if(val === PASS) {
+      err.textContent = '';
+      input.style.borderColor = '#27ae60';
+      input.style.background  = 'rgba(39,174,96,0.15)';
+      setTimeout(unlock, 400);
+    } else {
+      attempts++;
+      input.classList.remove('shake','error');
+      void input.offsetWidth;
+      input.classList.add('error','shake');
+      input.value = '';
+      updateDots('');
+      if(attempts >= 5) {
+        locked = true;
+        err.textContent = '🔒 تم إيقاف المحاولات — أعد تحميل الصفحة';
+        input.disabled = true;
+      } else {
+        err.textContent = `كلمة السر غير صحيحة — محاولة ${attempts} من 5`;
+        setTimeout(()=>{ input.classList.remove('error','shake'); }, 600);
+      }
+    }
+  };
+
+  window.onLockInput = function(el) {
+    updateDots(el.value);
+    if(el.value.length === 6) setTimeout(window.checkPassword, 120);
+  };
+
+  window.toggleLockVis = function() {
+    const inp = document.getElementById('lockInput');
+    const btn = document.getElementById('lockToggle');
+    if(!inp) return;
+    if(inp.type==='password'){ inp.type='text'; btn.textContent='🙈'; }
+    else { inp.type='password'; btn.textContent='👁'; }
+    inp.focus();
+  };
+
+  function updateDots(val) {
+    for(let i=1;i<=6;i++){
+      const d = document.getElementById('d'+i);
+      if(d) d.className = 'lock-dot' + (i<=val.length?' filled':'');
+    }
+  }
+
+  const style = document.createElement('style');
+  style.textContent = '@keyframes fadeOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(1.04)}}';
+  document.head.appendChild(style);
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    if(sessionStorage.getItem(SESSION_KEY)!=='1'){
+      const inp = document.getElementById('lockInput');
+      if(inp) setTimeout(()=>inp.focus(), 300);
+    }
+  });
+})();
+
+// ===============================
+// ===============================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('liveClock').textContent = now.toLocaleTimeString('ar-SA');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===============================
+// INIT
+// ===============================
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderDashboard();
+  renderCalendar();
+  updateNavBadges();
+  updateStaffNavBadge();
+  refreshEmailDropdowns();
+  renderTermInfoBar();
+  updateHeaderYear();
+});
+window.addEventListener('load', ()=>{
+  renderDashboard();
+  renderCalendar();
+  updateNavBadges();
+  updateStaffNavBadge();
+  refreshEmailDropdowns();
+  renderTermInfoBar();
+  updateHeaderYear();
+});
+</script>
+</body>
+</html>
